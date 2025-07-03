@@ -1,6 +1,8 @@
 import re
 import os
 import json
+import time
+import random
 from langchain_community.document_loaders import YoutubeLoader
 
 # Función para limpiar nombres de archivos eliminando caracteres no válidos
@@ -16,17 +18,18 @@ def get_youtube_transcript(url: str, lan: str):
             language=[lan]
         )
         transcript_data = loader.load()
-        
-        # Extraer solo el texto de la transcripción
         transcript_text = " ".join(doc.page_content for doc in transcript_data)
         return transcript_text
-
     except Exception as e:
+        # Detectar error por IP bloqueada
+        if "IP" in str(e) or "429" in str(e) or "blocked" in str(e).lower():
+            print("🛑 IP bloqueada por YouTube. Deteniendo script.")
+            exit(1)
         return None
 
 # Leer el archivo JSON con los videos
 name_channel = "Andy Cruz"
-input_file = f"links_{name_channel}.json"  # Nombre del archivo con los títulos y URLs
+input_file = f"links_{name_channel}.json"  # Archivo con los títulos y URLs
 output_folder = f"Transcriptions {name_channel}"  # Carpeta para guardar las transcripciones
 
 # Crear la carpeta si no existe
@@ -36,7 +39,7 @@ os.makedirs(output_folder, exist_ok=True)
 with open(input_file, "r", encoding="utf-8") as file:
     video_data = json.load(file)
 
-# Procesar cada video del array
+# Procesar cada video
 for video in video_data:
     try:
         title = video.get("title", "Sin título")
@@ -55,12 +58,14 @@ for video in video_data:
         transcript = get_youtube_transcript(url, lan="es")
 
         if transcript:
-            # Guardar la transcripción en un archivo
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(transcript)
             print(f"✅ Guardado: {filename}")
         else:
             print(f"⚠️ No se pudo obtener la transcripción de: {title}")
+
+        # Esperar un tiempo aleatorio entre videos (anti-baneo)
+        time.sleep(random.uniform(2, 5))
 
     except Exception as e:
         print(f"❌ Error procesando '{title}': {e}")
